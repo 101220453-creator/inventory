@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AL Mokhtar Inventory Pro</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print { .print-hidden { display: none !important; } }
+        body { background: #f0fdf4; min-height: 100vh; font-family: sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function ALMokhtarInventory() {
+            const [items, setItems] = useState([]);
+            const [places, setPlaces] = useState(['المخزن الرئيسي', 'الورشة', 'المكتب']);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [showPlaceManager, setShowPlaceManager] = useState(false);
+            const [reportPlace, setReportPlace] = useState('');
+            const [newPlaceInput, setNewPlaceInput] = useState('');
+            const [formData, setFormData] = useState({ name: '', place: '', exact: '', qty: '', status: '', notes: '' });
+
+            useEffect(() => {
+                const savedItems = localStorage.getItem('alm-items-final-v2');
+                const savedPlaces = localStorage.getItem('alm-places-final-v2');
+                if (savedItems) setItems(JSON.parse(savedItems));
+                if (savedPlaces) setPlaces(JSON.parse(savedPlaces));
+            }, []);
+
+            const saveAll = (updatedItems, updatedPlaces) => {
+                setItems(updatedItems);
+                setPlaces(updatedPlaces);
+                localStorage.setItem('alm-items-final-v2', JSON.stringify(updatedItems));
+                localStorage.setItem('alm-places-final-v2', JSON.stringify(updatedPlaces));
+            };
+
+            const addItem = () => {
+                if(!formData.name || !formData.place || !formData.exact) {
+                    return alert("Please fill mandatory fields: Name, General Place, and Exact Location.");
+                }
+                saveAll([...items, { ...formData, id: Date.now() }], places);
+                setFormData({ name: '', place: '', exact: '', qty: '', status: '', notes: '' });
+            };
+
+            const addPlaceOption = () => {
+                if(!newPlaceInput || places.includes(newPlaceInput)) return;
+                saveAll(items, [...places, newPlaceInput]);
+                setNewPlaceInput('');
+            };
+
+            const deletePlaceOption = (p) => {
+                if(confirm(`Remove "${p}"?`)) saveAll(items, places.filter(pl => pl !== p));
+            };
+
+            const deleteItem = (id) => {
+                if(confirm("Delete this entry?")) saveAll(items.filter(i => i.id !== id), places);
+            };
+
+            const filteredItems = items.filter(i => 
+                i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                i.place.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            return (
+                <div className="max-w-6xl mx-auto p-4 md:p-8">
+                    {/* HEADER */}
+                    <div className="text-center mb-6 bg-[#00796b] text-white p-6 rounded-3xl shadow-xl print-hidden">
+                        <h1 className="text-3xl font-bold uppercase tracking-wide">AL Mokhtar Inventory</h1>
+                        <p className="opacity-90">Search & Management System</p>
+                    </div>
+
+                    {/* 1. SEARCH SECTION */}
+                    <div className="mb-6 print-hidden">
+                        <input 
+                            type="text" 
+                            placeholder="🔍 Search items or places... ابحث هنا" 
+                            className="w-full p-5 rounded-2xl border-2 border-emerald-200 shadow-md focus:border-[#00796b] outline-none transition-all text-lg text-right"
+                            dir="rtl"
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+
+                    {/* 2. ALL ITEMS TABLE */}
+                    {!reportPlace && (
+                        <div className="bg-white rounded-3xl shadow-xl overflow-hidden mb-10 border border-emerald-100 print-hidden">
+                            <div className="bg-emerald-800 text-white p-4 font-bold text-center tracking-widest">Inventory List</div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-right" dir="rtl">
+                                    <thead className="bg-emerald-50 text-emerald-900 border-b-2 border-emerald-100">
+                                        <tr>
+                                            <th className="p-4">Item الصنف</th>
+                                            <th className="p-4">General Place المكان العام</th>
+                                            <th className="p-4">Exact بالتحديد</th>
+                                            <th className="p-4 text-center">Qty</th>
+                                            <th className="p-4 text-center">Status الحالة</th>
+                                            <th className="p-4 text-center">Notes ملاحظات</th>
+                                            <th className="p-4 text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredItems.map(item => (
+                                            <tr key={item.id} className="border-b hover:bg-emerald-50 transition">
+                                                <td className="p-4 font-bold">{item.name}</td>
+                                                <td className="p-4"><span className="bg-emerald-100 text-emerald-800 px-2 py-1 rounded-lg text-xs font-bold">{item.place}</span></td>
+                                                <td className="p-4 text-gray-600">{item.exact}</td>
+                                                <td className="p-4 text-center font-bold text-emerald-700">{item.qty || '-'}</td>
+                                                <td className="p-4 text-center text-blue-600 italic text-sm">{item.status || '-'}</td>
+                                                <td className="p-4 text-center text-gray-500 text-sm">{item.notes || '-'}</td>
+                                                <td className="p-4 text-center">
+                                                    <button onClick={() => deleteItem(item.id)} className="text-red-400 hover:text-red-600 font-bold">Delete</button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {filteredItems.length === 0 && <div className="p-10 text-center text-gray-400 italic">Start by adding items below...</div>}
+                        </div>
+                    )}
+
+                    {/* 3. MANAGEMENT TOOLS */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10 print-hidden">
+                        {/* Add Item Block */}
+                        <div className="lg:col-span-2 bg-white p-6 rounded-3xl shadow-lg border-t-4 border-[#00796b]">
+                            <h2 className="font-bold text-[#00796b] mb-4 text-lg border-b pb-2">Entry Form</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-emerald-800 uppercase">Item Name*</label>
+                                    <input placeholder="اسم الصنف" className="w-full p-3 border rounded-xl text-right bg-gray-50 focus:bg-white outline-none" dir="rtl" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}/>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-emerald-800 uppercase">General Place*</label>
+                                    <select className="w-full p-3 border rounded-xl text-right bg-gray-50 outline-none" dir="rtl" value={formData.place} onChange={e => setFormData({...formData, place: e.target.value})}>
+                                        <option value="">اختر المكان العام</option>
+                                        {places.map(p => <option key={p} value={p}>{p}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-emerald-800 uppercase">Exact Location*</label>
+                                    <input placeholder="الموقع بالتحديد" className="w-full p-3 border rounded-xl text-right bg-gray-50 outline-none" dir="rtl" value={formData.exact} onChange={e => setFormData({...formData, exact: e.target.value})}/>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-gray-400 uppercase">Quantity (Opt)</label>
+                                    <input placeholder="الكمية" className="w-full p-3 border rounded-xl text-right bg-gray-50 outline-none" dir="rtl" value={formData.qty} onChange={e => setFormData({...formData, qty: e.target.value})}/>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-gray-400 uppercase">Status (Opt)</label>
+                                    <input placeholder="Status: Borrowed, New..." className="w-full p-3 border rounded-xl text-right bg-gray-50 outline-none" dir="rtl" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}/>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-gray-400 uppercase">Notes (Opt)</label>
+                                    <input placeholder="أي ملاحظات إضافية" className="w-full p-3 border rounded-xl text-right bg-gray-50 outline-none" dir="rtl" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})}/>
+                                </div>
+                            </div>
+                            <button onClick={addItem} className="mt-6 w-full bg-[#00796b] text-white p-4 rounded-xl font-bold shadow-lg hover:bg-emerald-800 transition">Save Entry</button>
+                        </div>
+
+                        {/* Manage Places Block */}
+                        <div className="bg-white p-6 rounded-3xl shadow-lg border-t-4 border-gray-400 h-fit">
+                            <h2 className="font-bold text-gray-700 mb-4 text-lg border-b pb-2">Place Options</h2>
+                            <div className="flex gap-2 mb-4">
+                                <input value={newPlaceInput} onChange={e => setNewPlaceInput(e.target.value)} placeholder="New place..." className="flex-1 p-2 border rounded-lg text-right text-sm outline-none" dir="rtl"/>
+                                <button onClick={addPlaceOption} className="bg-gray-700 text-white px-3 rounded-lg text-sm font-bold">Add</button>
+                            </div>
+                            <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1">
+                                {places.map((p, idx) => (
+                                    <div key={idx} className="flex items-center bg-gray-100 rounded-lg text-xs overflow-hidden border">
+                                        <span className="px-2 py-1 font-medium">{p}</span>
+                                        <button onClick={() => deletePlaceOption(p)} className="bg-red-50 px-2 py-1 text-red-500 hover:bg-red-500 hover:text-white transition">✕</button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 4. REPORT SECTION */}
+                    <div className="bg-orange-50 p-6 rounded-3xl border-2 border-orange-200 mb-8 print-hidden">
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                            <h2 className="font-bold text-orange-900 text-xl">📍 Location Report</h2>
+                            <div className="flex gap-2 w-full md:w-auto">
+                                <select className="flex-1 md:w-64 p-3 border-2 border-orange-200 rounded-xl font-bold text-right shadow-sm outline-none" dir="rtl" value={reportPlace} onChange={e => setReportPlace(e.target.value)}>
+                                    <option value="">Select Place to Print...</option>
+                                    {places.map(p => <option key={p} value={p}>{p}</option>)}
+                                </select>
+                                {reportPlace && (
+                                    <div className="flex gap-2">
+                                        <button onClick={() => window.print()} className="bg-orange-600 text-white px-6 rounded-xl font-bold shadow-md">Print View</button>
+                                        <button onClick={() => setReportPlace('')} className="bg-white text-gray-500 px-4 rounded-xl border font-bold">Close</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* RENDER REPORT PRINT VIEW */}
+                    {reportPlace && (
+                        <div className="bg-white p-10 rounded-3xl shadow-2xl border border-gray-300">
+                            <div className="flex justify-between items-center border-b-4 border-emerald-700 pb-4 mb-8">
+                                <div className="text-left text-gray-400 text-sm">Date: {new Date().toLocaleDateString()}</div>
+                                <h2 className="text-3xl font-bold text-emerald-900">Inventory Report: {reportPlace}</h2>
+                            </div>
+                            <table className="w-full text-right" dir="rtl">
+                                <thead>
+                                    <tr className="bg-gray-100 text-emerald-900">
+                                        <th className="p-4 border">Item الصنف</th>
+                                        <th className="p-4 border text-center">Exact بالتحديد</th>
+                                        <th className="p-4 border text-center">Qty</th>
+                                        <th className="p-4 border text-center">Status الحالة</th>
+                                        <th className="p-4 border text-center">Notes ملاحظات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {items.filter(i => i.place === reportPlace).map(item => (
+                                        <tr key={item.id} className="border-b">
+                                            <td className="p-4 font-bold border">{item.name}</td>
+                                            <td className="p-4 text-center border text-emerald-700 font-semibold">{item.exact}</td>
+                                            <td className="p-4 text-center border font-bold bg-gray-50">{item.qty || '-'}</td>
+                                            <td className="p-4 text-center border italic">{item.status || '-'}</td>
+                                            <td className="p-4 text-center border text-gray-500">{item.notes || '-'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<ALMokhtarInventory />);
+    </script>
+</body>
+</html>
