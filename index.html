@@ -9,9 +9,8 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @media print { .print-hidden { display: none !important; } }
         body { background: #f0fdf4; min-height: 100vh; font-family: sans-serif; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #00796b; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; display: inline-block; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #00796b; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
@@ -20,18 +19,16 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // PASTE YOUR GOOGLE URL BELOW
+        // INSERT YOUR URL HERE
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxR5yegpLdzCzo8j5PUE1r9e3TC_M5iguRPsh96TLRVh-x49Ewy1EcGiNt2g-MdSXvIRg/exec";
 
         function ALMokhtarInventory() {
             const [items, setItems] = useState([]);
             const [places, setPlaces] = useState(['المخزن الرئيسي', 'الورشة', 'المكتب']);
             const [searchTerm, setSearchTerm] = useState('');
-            const [reportPlace, setReportPlace] = useState('');
             const [loading, setLoading] = useState(false);
             const [formData, setFormData] = useState({ name: '', place: '', exact: '', qty: '', status: '', notes: '' });
 
-            // LOAD DATA FROM GOOGLE
             const loadFromCloud = () => {
                 setLoading(true);
                 fetch(SCRIPT_URL)
@@ -43,18 +40,14 @@
                         }));
                         setItems(formatted);
                         setLoading(false);
-                    });
+                    })
+                    .catch(() => setLoading(false));
             };
 
-            useEffect(() => {
-                loadFromCloud();
-                const savedPlaces = localStorage.getItem('alm-places-cloud');
-                if (savedPlaces) setPlaces(JSON.parse(savedPlaces));
-            }, []);
+            useEffect(() => { loadFromCloud(); }, []);
 
-            // SAVE DATA TO GOOGLE
             const addItem = () => {
-                if(!formData.name || !formData.place || !formData.exact) return alert("Fill mandatory fields!");
+                if(!formData.name || !formData.place) return alert("Please enter Name and Place");
                 setLoading(true);
                 fetch(SCRIPT_URL, {
                     method: "POST",
@@ -62,68 +55,87 @@
                     body: JSON.stringify(formData)
                 }).then(() => {
                     setFormData({ name: '', place: '', exact: '', qty: '', status: '', notes: '' });
-                    setTimeout(loadFromCloud, 2500); // Give Google a moment to update
+                    alert("Sent to Google Sheet!");
+                    setTimeout(loadFromCloud, 2000);
                 });
             };
 
             const filteredItems = searchTerm.trim() === "" ? [] : items.filter(i => 
-                i.name.toLowerCase().includes(searchTerm.toLowerCase())
+                String(i.name).toLowerCase().includes(searchTerm.toLowerCase())
             );
 
             return (
-                <div className="max-w-6xl mx-auto p-4 md:p-8">
-                    <div className="text-center mb-6 bg-[#00796b] text-white p-6 rounded-3xl shadow-xl">
-                        <h1 className="text-3xl font-bold uppercase">AL Mokhtar Cloud</h1>
-                        <p className="opacity-90 font-bold">SYC ACTIVE - All Workers Linked</p>
+                <div className="max-w-4xl mx-auto p-4">
+                    <div className="text-center mb-6 bg-[#00796b] text-white p-6 rounded-2xl shadow-lg">
+                        <h1 className="text-2xl font-bold">AL MOKHTAR CLOUD</h1>
+                        <p className="text-sm opacity-80">Shared Inventory System</p>
                     </div>
 
-                    {/* 1. SEARCH */}
+                    {/* ADD ITEM SECTION - NOW AT THE TOP */}
+                    <div className="bg-white p-6 rounded-2xl shadow-md border-b-4 border-emerald-500 mb-8">
+                        <h2 className="font-bold text-emerald-800 mb-4 text-right">إضافة صنف جديد (Add New)</h2>
+                        <div className="grid grid-cols-1 gap-3">
+                            <input placeholder="Item Name / اسم الصنف*" className="p-3 border rounded-xl text-right bg-gray-50 outline-none focus:border-emerald-500 border-2" dir="rtl" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}/>
+                            
+                            <select className="p-3 border rounded-xl text-right bg-gray-50 border-2" dir="rtl" value={formData.place} onChange={e => setFormData({...formData, place: e.target.value})}>
+                                <option value="">Choose Place / اختر المكان*</option>
+                                {places.map(p => <option key={p} value={p}>{p}</option>)}
+                            </select>
+
+                            <input placeholder="Exact Location / الموقع بالتحديد*" className="p-3 border rounded-xl text-right bg-gray-50 border-2" dir="rtl" value={formData.exact} onChange={e => setFormData({...formData, exact: e.target.value})}/>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                                <input placeholder="Qty / الكمية" className="p-3 border rounded-xl text-right bg-gray-50 border-2" dir="rtl" value={formData.qty} onChange={e => setFormData({...formData, qty: e.target.value})}/>
+                                <input placeholder="Status / الحالة" className="p-3 border rounded-xl text-right bg-gray-50 border-2" dir="rtl" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}/>
+                            </div>
+                            
+                            <button 
+                                onClick={addItem} 
+                                disabled={loading}
+                                className="mt-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2"
+                            >
+                                {loading ? <div className="loader"></div> : "SAVE TO CLOUD / حفظ في النظام"}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* SEARCH SECTION */}
                     <div className="mb-6">
-                        <input type="text" placeholder="🔍 Search Shared Inventory..." 
-                            className="w-full p-5 rounded-2xl border-2 border-emerald-200 shadow-lg text-right outline-none" 
-                            dir="rtl" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                        <label className="block text-emerald-900 font-bold mb-1 text-right">Search / بحث</label>
+                        <input 
+                            type="text" 
+                            placeholder="Type name to search... ابحث هنا" 
+                            className="w-full p-4 rounded-xl border-2 border-emerald-200 shadow-inner text-right outline-none focus:border-emerald-600" 
+                            dir="rtl" 
+                            value={searchTerm} 
+                            onChange={(e) => setSearchTerm(e.target.value)} 
+                        />
                     </div>
 
-                    {/* 2. RESULTS */}
+                    {/* SEARCH RESULTS */}
                     {searchTerm.trim() !== "" && (
-                        <div className="bg-white rounded-3xl shadow-xl overflow-hidden mb-10 border-2 border-emerald-400">
-                            {loading && <div className="p-4 text-center"><div className="loader"></div></div>}
+                        <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-emerald-500">
                             <table className="w-full text-right" dir="rtl">
-                                <thead className="bg-emerald-700 text-white">
-                                    <tr><th className="p-4">Item</th><th className="p-4">Place</th><th className="p-4">Qty</th><th className="p-4 text-center">Date</th></tr>
+                                <thead className="bg-emerald-700 text-white text-sm">
+                                    <tr>
+                                        <th className="p-3">Item</th>
+                                        <th className="p-3">Place</th>
+                                        <th className="p-3">Qty</th>
+                                    </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredItems.map(item => (
-                                        <tr key={item.id} className="border-b">
-                                            <td className="p-4 font-bold">{item.name}</td>
-                                            <td className="p-4 text-sm">{item.place} ({item.exact})</td>
-                                            <td className="p-4 font-bold">{item.qty}</td>
-                                            <td className="p-4 text-xs text-gray-400 text-center">{item.dateAdded}</td>
+                                    {filteredItems.map((item, idx) => (
+                                        <tr key={idx} className="border-b last:border-0 hover:bg-emerald-50">
+                                            <td className="p-3 font-bold">{item.name}</td>
+                                            <td className="p-3 text-sm text-gray-600">{item.place}</td>
+                                            <td className="p-3 font-bold text-emerald-700">{item.qty || '0'}</td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
+                            {filteredItems.length === 0 && <div className="p-6 text-center text-gray-400">No items found / لم يتم العثور على نتائج</div>}
                         </div>
                     )}
-
-                    {/* 3. ADD FORM */}
-                    <div className="bg-white p-6 rounded-3xl shadow-lg border-t-4 border-[#00796b] mb-10">
-                        <h2 className="font-bold text-[#00796b] mb-4">Add Item to Company Cloud</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <input placeholder="Item Name*" className="p-3 border rounded-xl text-right" dir="rtl" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}/>
-                            <select className="p-3 border rounded-xl text-right" dir="rtl" value={formData.place} onChange={e => setFormData({...formData, place: e.target.value})}>
-                                <option value="">Place*</option>
-                                {places.map(p => <option key={p} value={p}>{p}</option>)}
-                            </select>
-                            <input placeholder="Exact Location*" className="p-3 border rounded-xl text-right" dir="rtl" value={formData.exact} onChange={e => setFormData({...formData, exact: e.target.value})}/>
-                            <input placeholder="Qty" className="p-3 border rounded-xl text-right" dir="rtl" value={formData.qty} onChange={e => setFormData({...formData, qty: e.target.value})}/>
-                            <input placeholder="Status" className="p-3 border rounded-xl text-right" dir="rtl" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}/>
-                            <input placeholder="Notes" className="p-3 border rounded-xl text-right" dir="rtl" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})}/>
-                        </div>
-                        <button onClick={addItem} disabled={loading} className="mt-6 w-full bg-[#00796b] text-white p-4 rounded-xl font-bold disabled:bg-gray-400">
-                            {loading ? "Syncing..." : "Save to Cloud"}
-                        </button>
-                    </div>
                 </div>
             );
         }
