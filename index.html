@@ -9,6 +9,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        @media print { .print-hidden { display: none !important; } }
         body { background: #f0fdf4; min-height: 100vh; font-family: sans-serif; }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #00796b; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -19,13 +20,14 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // INSERT YOUR URL HERE
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxR5yegpLdzCzo8j5PUE1r9e3TC_M5iguRPsh96TLRVh-x49Ewy1EcGiNt2g-MdSXvIRg/exec";
 
         function ALMokhtarInventory() {
             const [items, setItems] = useState([]);
             const [places, setPlaces] = useState(['المخزن الرئيسي', 'الورشة', 'المكتب']);
             const [searchTerm, setSearchTerm] = useState('');
+            const [reportPlace, setReportPlace] = useState('');
+            const [newPlaceInput, setNewPlaceInput] = useState('');
             const [loading, setLoading] = useState(false);
             const [formData, setFormData] = useState({ name: '', place: '', exact: '', qty: '', status: '', notes: '' });
 
@@ -40,14 +42,17 @@
                         }));
                         setItems(formatted);
                         setLoading(false);
-                    })
-                    .catch(() => setLoading(false));
+                    }).catch(() => setLoading(false));
             };
 
-            useEffect(() => { loadFromCloud(); }, []);
+            useEffect(() => {
+                loadFromCloud();
+                const savedPlaces = localStorage.getItem('alm-places-cloud-v4');
+                if (savedPlaces) setPlaces(JSON.parse(savedPlaces));
+            }, []);
 
             const addItem = () => {
-                if(!formData.name || !formData.place) return alert("Please enter Name and Place");
+                if(!formData.name || !formData.place || !formData.exact) return alert("Fill Name, Place, and Exact Location!");
                 setLoading(true);
                 fetch(SCRIPT_URL, {
                     method: "POST",
@@ -55,9 +60,38 @@
                     body: JSON.stringify(formData)
                 }).then(() => {
                     setFormData({ name: '', place: '', exact: '', qty: '', status: '', notes: '' });
-                    alert("Sent to Google Sheet!");
-                    setTimeout(loadFromCloud, 2000);
+                    alert("Sync Successful!");
+                    setTimeout(loadFromCloud, 2500);
                 });
+            };
+
+            const addPlaceOption = () => {
+                if(!newPlaceInput || places.includes(newPlaceInput)) return;
+                const updated = [...places, newPlaceInput];
+                setPlaces(updated);
+                localStorage.setItem('alm-places-cloud-v4', JSON.stringify(updated));
+                setNewPlaceInput('');
+            };
+
+            const deletePlaceOption = (p) => {
+                if(confirm(`Remove "${p}"?`)) {
+                    const updated = places.filter(pl => pl !== p);
+                    setPlaces(updated);
+                    localStorage.setItem('alm-places-cloud-v4', JSON.stringify(updated));
+                }
+            };
+
+            const exportToExcel = (placeName) => {
+                const dataToExport = items.filter(i => i.place === placeName);
+                let csvContent = "data:text/csv;charset=utf-8,Item,Place,Exact,Qty,Status,Notes,Date\n";
+                dataToExport.forEach(i => {
+                    csvContent += `${i.name},${i.place},${i.exact},${i.qty},${i.status},${i.notes},${i.dateAdded}\n`;
+                });
+                const link = document.createElement("a");
+                link.setAttribute("href", encodeURI(csvContent));
+                link.setAttribute("download", `Report_${placeName}.csv`);
+                document.body.appendChild(link);
+                link.click();
             };
 
             const filteredItems = searchTerm.trim() === "" ? [] : items.filter(i => 
@@ -65,75 +99,104 @@
             );
 
             return (
-                <div className="max-w-4xl mx-auto p-4">
-                    <div className="text-center mb-6 bg-[#00796b] text-white p-6 rounded-2xl shadow-lg">
-                        <h1 className="text-2xl font-bold">AL MOKHTAR CLOUD</h1>
-                        <p className="text-sm opacity-80">Shared Inventory System</p>
+                <div className="max-w-4xl mx-auto p-4 md:p-8">
+                    {/* HEADER */}
+                    <div className="text-center mb-6 bg-[#00796b] text-white p-6 rounded-3xl shadow-xl print-hidden">
+                        <h1 className="text-3xl font-bold uppercase">AL Mokhtar Cloud</h1>
+                        <p className="opacity-90 font-bold">Full Company Sync - متصل بالنظام السحابي</p>
                     </div>
 
-                    {/* ADD ITEM SECTION - NOW AT THE TOP */}
-                    <div className="bg-white p-6 rounded-2xl shadow-md border-b-4 border-emerald-500 mb-8">
+                    {/* 1. ADD ITEM SECTION (TOP) */}
+                    <div className="bg-white p-6 rounded-3xl shadow-lg border-t-4 border-emerald-500 mb-8 print-hidden">
                         <h2 className="font-bold text-emerald-800 mb-4 text-right">إضافة صنف جديد (Add New)</h2>
-                        <div className="grid grid-cols-1 gap-3">
-                            <input placeholder="Item Name / اسم الصنف*" className="p-3 border rounded-xl text-right bg-gray-50 outline-none focus:border-emerald-500 border-2" dir="rtl" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}/>
-                            
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <input placeholder="Item Name*" className="p-3 border rounded-xl text-right bg-gray-50 border-2" dir="rtl" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}/>
                             <select className="p-3 border rounded-xl text-right bg-gray-50 border-2" dir="rtl" value={formData.place} onChange={e => setFormData({...formData, place: e.target.value})}>
-                                <option value="">Choose Place / اختر المكان*</option>
+                                <option value="">Choose Place*</option>
                                 {places.map(p => <option key={p} value={p}>{p}</option>)}
                             </select>
-
-                            <input placeholder="Exact Location / الموقع بالتحديد*" className="p-3 border rounded-xl text-right bg-gray-50 border-2" dir="rtl" value={formData.exact} onChange={e => setFormData({...formData, exact: e.target.value})}/>
-                            
-                            <div className="grid grid-cols-2 gap-2">
-                                <input placeholder="Qty / الكمية" className="p-3 border rounded-xl text-right bg-gray-50 border-2" dir="rtl" value={formData.qty} onChange={e => setFormData({...formData, qty: e.target.value})}/>
-                                <input placeholder="Status / الحالة" className="p-3 border rounded-xl text-right bg-gray-50 border-2" dir="rtl" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}/>
-                            </div>
-                            
-                            <button 
-                                onClick={addItem} 
-                                disabled={loading}
-                                className="mt-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2"
-                            >
-                                {loading ? <div className="loader"></div> : "SAVE TO CLOUD / حفظ في النظام"}
-                            </button>
+                            <input placeholder="Exact Location*" className="p-3 border rounded-xl text-right bg-gray-50 border-2" dir="rtl" value={formData.exact} onChange={e => setFormData({...formData, exact: e.target.value})}/>
+                            <input placeholder="Qty" className="p-3 border rounded-xl text-right bg-gray-50 border-2" dir="rtl" value={formData.qty} onChange={e => setFormData({...formData, qty: e.target.value})}/>
+                            <input placeholder="Status" className="p-3 border rounded-xl text-right bg-gray-50 border-2" dir="rtl" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}/>
+                            <input placeholder="Notes" className="p-3 border rounded-xl text-right bg-gray-50 border-2" dir="rtl" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})}/>
                         </div>
+                        <button onClick={addItem} disabled={loading} className="mt-6 w-full bg-emerald-600 text-white p-4 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2">
+                            {loading ? <div className="loader"></div> : "SAVE TO CLOUD / حفظ في النظام"}
+                        </button>
                     </div>
 
-                    {/* SEARCH SECTION */}
-                    <div className="mb-6">
-                        <label className="block text-emerald-900 font-bold mb-1 text-right">Search / بحث</label>
-                        <input 
-                            type="text" 
-                            placeholder="Type name to search... ابحث هنا" 
-                            className="w-full p-4 rounded-xl border-2 border-emerald-200 shadow-inner text-right outline-none focus:border-emerald-600" 
-                            dir="rtl" 
-                            value={searchTerm} 
-                            onChange={(e) => setSearchTerm(e.target.value)} 
-                        />
+                    {/* 2. SEARCH SECTION */}
+                    <div className="mb-6 print-hidden">
+                        <label className="block text-emerald-900 font-bold mb-2 text-right">Search / بحث</label>
+                        <input type="text" placeholder="Type item name to search... ابحث هنا" className="w-full p-4 rounded-2xl border-2 border-emerald-200 shadow-md text-right outline-none" dir="rtl" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                     </div>
 
-                    {/* SEARCH RESULTS */}
+                    {/* 3. RESULTS */}
                     {searchTerm.trim() !== "" && (
-                        <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-emerald-500">
+                        <div className="bg-white rounded-3xl shadow-xl overflow-hidden mb-10 border-2 border-emerald-400 print-hidden">
                             <table className="w-full text-right" dir="rtl">
-                                <thead className="bg-emerald-700 text-white text-sm">
-                                    <tr>
-                                        <th className="p-3">Item</th>
-                                        <th className="p-3">Place</th>
-                                        <th className="p-3">Qty</th>
-                                    </tr>
+                                <thead className="bg-emerald-700 text-white">
+                                    <tr><th className="p-4">Item</th><th className="p-4">Place</th><th className="p-4 text-center">Qty</th><th className="p-4 text-center">Date</th></tr>
                                 </thead>
                                 <tbody>
                                     {filteredItems.map((item, idx) => (
-                                        <tr key={idx} className="border-b last:border-0 hover:bg-emerald-50">
-                                            <td className="p-3 font-bold">{item.name}</td>
-                                            <td className="p-3 text-sm text-gray-600">{item.place}</td>
-                                            <td className="p-3 font-bold text-emerald-700">{item.qty || '0'}</td>
+                                        <tr key={idx} className="border-b last:border-0">
+                                            <td className="p-4 font-bold">{item.name}</td>
+                                            <td className="p-4 text-sm">{item.place} ({item.exact})</td>
+                                            <td className="p-4 text-center font-bold">{item.qty || '0'}</td>
+                                            <td className="p-4 text-center text-[10px] text-gray-400 leading-tight">{item.dateAdded}</td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
-                            {filteredItems.length === 0 && <div className="p-6 text-center text-gray-400">No items found / لم يتم العثور على نتائج</div>}
+                            {filteredItems.length === 0 && <div className="p-10 text-center text-gray-400 italic">No matches.</div>}
+                        </div>
+                    )}
+
+                    {/* 4. PLACES & REPORTS MANAGER */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 print-hidden">
+                        <div className="bg-white p-6 rounded-3xl shadow-lg border-t-4 border-gray-400">
+                            <h2 className="font-bold text-gray-700 mb-4 border-b">Edit Places / تعديل الأماكن</h2>
+                            <div className="flex gap-2 mb-4">
+                                <input value={newPlaceInput} onChange={e => setNewPlaceInput(e.target.value)} placeholder="New place..." className="flex-1 p-2 border rounded-lg text-right" dir="rtl"/>
+                                <button onClick={addPlaceOption} className="bg-gray-700 text-white px-4 rounded-lg font-bold">Add</button>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {places.map((p, idx) => (
+                                    <span key={idx} className="bg-gray-100 px-2 py-1 rounded border flex items-center gap-2">
+                                        {p} <button onClick={() => deletePlaceOption(p)} className="text-red-500">✕</button>
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-orange-50 p-6 rounded-3xl border-2 border-orange-200">
+                            <h2 className="font-bold text-orange-900 mb-4 border-b border-orange-200">Reports / التقارير</h2>
+                            <select className="w-full p-3 border-2 border-orange-200 rounded-xl font-bold text-right outline-none" dir="rtl" value={reportPlace} onChange={e => setReportPlace(e.target.value)}>
+                                <option value="">Select Place to View...</option>
+                                {places.map(p => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                            {reportPlace && (
+                                <div className="flex gap-2 mt-4">
+                                    <button onClick={() => window.print()} className="flex-1 bg-orange-600 text-white p-2 rounded-xl font-bold shadow">Print</button>
+                                    <button onClick={() => exportToExcel(reportPlace)} className="flex-1 bg-emerald-600 text-white p-2 rounded-xl font-bold shadow">Excel</button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 5. PRINT VIEW (Hidden on screen, shows on print/report select) */}
+                    {reportPlace && (
+                        <div className="bg-white p-8 rounded-xl border-2">
+                            <h2 className="text-2xl font-bold text-center border-b-2 pb-4 mb-4">Report: {reportPlace}</h2>
+                            <table className="w-full text-right" dir="rtl">
+                                <thead><tr className="bg-gray-100"><th className="p-2 border">Item</th><th className="p-2 border">Exact Location</th><th className="p-2 border text-center">Qty</th><th className="p-2 border text-center">Status</th></tr></thead>
+                                <tbody>
+                                    {items.filter(i => i.place === reportPlace).map((item, idx) => (
+                                        <tr key={idx}><td className="p-2 border font-bold">{item.name}</td><td className="p-2 border">{item.exact}</td><td className="p-2 border text-center font-bold">{item.qty}</td><td className="p-2 border text-center italic">{item.status}</td></tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     )}
                 </div>
